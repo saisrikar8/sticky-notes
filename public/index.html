@@ -52,12 +52,12 @@
         return data.groupId;
     }
 
-    async function postSticky(title, text, color, groupId) {
+    async function postSticky(title, text, color, groupId, x, y) {
         const res = await fetch('/api/post-sticky', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ title, text, color, groupId })
+            body: JSON.stringify({ title, text, color, groupId, x, y })
         });
         const data = await res.json();
         log("Post Sticky: " + JSON.stringify(data));
