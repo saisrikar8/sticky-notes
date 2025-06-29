@@ -1,7 +1,3 @@
 export function initMap(mapElement) {
-    mapElement.style.backgroundColor = '#f0f0f0';
-    mapElement.style.width = '100vw';
-    mapElement.style.height = '100vh';
-    mapElement.style.position = 'relative';
-    mapElement.style.overflow = 'hidden';
+    //mapElement.style.background = "repeating-linear-gradient(0deg, #ddd 0 1px, transparent 1px 20px), repeating-linear-gradient(90deg, #ddd 0 1px, transparent 1px 20px)";
 }
