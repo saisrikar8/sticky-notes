@@ -5,7 +5,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const { verifyCookie, hashPassword, verifyPassword, createJwtToken } = require("./utils.cjs");
 const { jwtDecode } = require("jwt-decode");
 require('dotenv').config();
-
+const jwt = require("jsonwebtoken");
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
@@ -20,8 +20,11 @@ const usersCollection = dbclient.db("sticky-notes-game").collection("users");
 app.get('/', async (req, res) => {
     const token = req.cookies?.token;
     const userId = req.cookies?.user;
+    console.log(token);
+    console.log(userId);
 
-    if (!token || !userId) {
+    if (!token && !userId) {
+        console.log("going login")
         return res.redirect('/login');
     }
 
@@ -35,10 +38,11 @@ app.get('/', async (req, res) => {
             return res.redirect('/login');
         }
 
-        res.sendFile(path.join(__dirname, 'public', 'index.html'), {
+        res.sendFile(path.join(__dirname, 'public', 'mainscreen.html'), {
             headers: { 'Content-Type': 'text/html' }
         });
     } catch (err) {
+        console.log(err);
         return res.redirect('/login');
     }
 });
@@ -50,7 +54,6 @@ app.get('/login', (req, res) => {
 app.get('/register', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'register.html'));
 });
-
 
 app.post("/api/register", async (req, res) => {
     const email = req.body.email.trim();
@@ -79,17 +82,6 @@ app.post("/api/register", async (req, res) => {
     return res.json({ status: "success", message: "Your account was successfully created", token, exp: jwtDecode(token).exp });
 });
 
-app.post('/api/create-group', verifyCookie, async (req, res) => {
-    const { name } = req.body;
-    const result = await groupsCollection.insertOne({ name, stickies: [] });
-    await usersCollection.updateOne(
-        { _id: req.user._id },
-        { $push: { groups: result.insertedId } }
-    );
-    res.status(200).json({ groupId: result.insertedId });
-});
-
-
 app.post("/api/login", async (req, res) => {
     const email = req.body.email.trim();
     const password = req.body.password.trim();
@@ -109,6 +101,23 @@ app.post("/api/login", async (req, res) => {
     res.cookie('user', user._id.toString(), { httpOnly: true, sameSite: 'Strict', maxAge: 3600000 });
 
     return res.json({ status: "success", message: "Welcome back! We're logging you in right now", token, exp: jwtDecode(token).exp });
+});
+
+app.get('/api/get-joined-groups', verifyCookie, async (req, res) => {
+    const user = req.user;
+    console.log(user);
+    return res.json(user.groups);
+
+})
+
+app.post('/api/create-group', verifyCookie, async (req, res) => {
+    const { name } = req.body;
+    const result = await groupsCollection.insertOne({ name, stickies: [] });
+    await usersCollection.updateOne(
+        { _id: req.user._id },
+        { $push: { groups: result.insertedId } }
+    );
+    res.status(200).json({ groupId: result.insertedId });
 });
 
 app.post('/api/update-sticky-size', verifyCookie, async (req, res) => {
@@ -156,8 +165,6 @@ app.post('/api/update-sticky-position', verifyCookie, async (req, res) => {
         res.status(500).json({ status: "error", message: "Internal server error" });
     }
 });
-
-
 
 app.post('/api/get-stickies', verifyCookie, async (req, res) => {
     try {

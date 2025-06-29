@@ -41,6 +41,7 @@ async function verifyCookie(req, res, next) {
         }
 
         req.user = user;
+        req.decoded = decoded;
         next();
     } catch (err) {
         console.log("verifyCookie error:", err);
