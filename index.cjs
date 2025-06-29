@@ -2,7 +2,7 @@ const express = require('express');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-const { verifyCookie, hashPassword, verifyPassword, createJwtToken } = require("./utils");
+const { verifyCookie, hashPassword, verifyPassword, createJwtToken } = require("./utils.cjs");
 const { jwtDecode } = require("jwt-decode");
 require('dotenv').config();
 
@@ -17,9 +17,35 @@ const stickiesCollection = dbclient.db("sticky-notes-game").collection("stickies
 const groupsCollection = dbclient.db("sticky-notes-game").collection("groups");
 const usersCollection = dbclient.db("sticky-notes-game").collection("users");
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'), { headers: { 'Content-Type': 'text/html' } });
+app.get('/', async (req, res) => {
+    const token = req.cookies?.token;
+    const userId = req.cookies?.user;
+
+    if (!token || !userId) {
+        return res.redirect('/login');
+    }
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SIGN_KEY);
+        const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
+
+        if (!user) {
+            return res.redirect('/login');
+        }
+
+        res.sendFile(path.join(__dirname, 'public', 'index.html'), {
+            headers: { 'Content-Type': 'text/html' }
+        });
+    } catch (err) {
+        return res.redirect('/login');
+    }
 });
+
+
+app.get('/login', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
 
 app.post("/api/register", async (req, res) => {
     const email = req.body.email.trim();
@@ -80,6 +106,54 @@ app.post("/api/login", async (req, res) => {
     return res.json({ status: "success", message: "Welcome back! We're logging you in right now", token, exp: jwtDecode(token).exp });
 });
 
+app.post('/api/update-sticky-size', verifyCookie, async (req, res) => {
+    try {
+        const { id, width, height } = req.body;
+        if (!id || !width || !height) {
+            return res.status(400).json({ status: "error", message: "Missing id, width, or height" });
+        }
+
+        const result = await stickiesCollection.updateOne(
+            { _id: new ObjectId(id) },
+            { $set: { width, height } }
+        );
+
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ status: "error", message: "Sticky note not found" });
+        }
+
+        res.status(200).json({ status: "success", message: "Sticky size updated" });
+    } catch (e) {
+        console.error("Error updating sticky size:", e);
+        res.status(500).json({ status: "error", message: "Internal server error" });
+    }
+});
+
+app.post('/api/update-sticky-position', verifyCookie, async (req, res) => {
+    try {
+        const { id, x, y } = req.body;
+        if (!id || typeof x !== 'number' || typeof y !== 'number') {
+            return res.status(400).json({ status: "error", message: "Missing or invalid id, x, or y" });
+        }
+
+        const result = await stickiesCollection.updateOne(
+            { _id: new ObjectId(id) },
+            { $set: { x, y } }
+        );
+
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ status: "error", message: "Sticky note not found" });
+        }
+
+        res.status(200).json({ status: "success", message: "Sticky position updated" });
+    } catch (e) {
+        console.error("Error updating sticky position:", e);
+        res.status(500).json({ status: "error", message: "Internal server error" });
+    }
+});
+
+
+
 app.post('/api/get-stickies', verifyCookie, async (req, res) => {
     try {
         const userGroups = req.user.groups || [];
@@ -95,8 +169,8 @@ app.post('/api/get-stickies', verifyCookie, async (req, res) => {
 
 app.post('/api/post-sticky', verifyCookie, async (req, res) => {
     try {
-        const { title, text, color, groupId } = req.body;
-        const stickyData = { title, text, color };
+        const { title, text, color, groupId, x, y, width, height } = req.body;
+        const stickyData = { title, text, color, groupId, x, y, width, height };
         const result = await stickiesCollection.insertOne(stickyData);
         const stickyId = result.insertedId;
 

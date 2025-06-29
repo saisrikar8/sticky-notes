@@ -1,182 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Sticky Notes Route Tester</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sticky Notes App</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: sans-serif;
+            overflow: hidden;
+        }
+        #map {
+            width: 100vw;
+            height: 100vh;
+            background: #f0f0f0;
+            position: relative;
+        }
+        .sticky {
+            position: absolute;
+            width: 150px;
+            height: 150px;
+            background: #fffc8c;
+            padding: 10px;
+            box-shadow: 2px 2px 6px rgba(0,0,0,0.2);
+            cursor: move;
+            resize: both;
+            overflow: auto;
+        }
+        .xy-label {
+            font-size: 11px;
+            color: #555;
+            position: absolute;
+            bottom: 2px;
+            right: 4px;
+        }
+    </style>
 </head>
 <body>
-<h1>Sticky Notes API Route Tester</h1>
-<button onclick="runTests()">Run All Tests</button>
-<pre id="log"></pre>
+<div id="map"></div>
 
-<script>
-    const logEl = document.getElementById('log');
-    const log = (msg) => {
-        logEl.textContent += msg + "\n";
-        console.log(msg);
-    };
-
-    async function register(email, password) {
-        const res = await fetch('/api/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ email, password })
-        });
-        const data = await res.json();
-        log("Register: " + JSON.stringify(data));
-        return data;
-    }
-
-    async function login(email, password) {
-        const res = await fetch('/api/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ email, password })
-        });
-        const data = await res.json();
-        log("Login: " + JSON.stringify(data));
-        return data;
-    }
-
-    async function createTestGroup() {
-        const res = await fetch('/api/create-group', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ name: 'Test Group from Browser' })
-        });
-        const data = await res.json();
-        log("Create Group: " + JSON.stringify(data));
-        return data.groupId;
-    }
-
-    async function postSticky(title, text, color, groupId, x, y) {
-        const res = await fetch('/api/post-sticky', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ title, text, color, groupId, x, y })
-        });
-        const data = await res.json();
-        log("Post Sticky: " + JSON.stringify(data));
-        return data.id;
-    }
-
-    async function getStickyNotes() {
-        const res = await fetch('/api/get-stickies', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include'
-        });
-        const data = await res.json();
-        log("Get Stickies: " + JSON.stringify(data));
-        return data;
-    }
-
-    async function removeSticky(stickyId) {
-        const res = await fetch('/api/remove-sticky', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ id: stickyId })
-        });
-        log("Remove Sticky: " + (res.ok ? "Success" : "Fail"));
-        return res.ok;
-    }
-
-    async function addStickyToGroup(groupId, stickyId) {
-        try {
-            const res = await fetch('/api/group/add-sticky', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ groupId, stickyId })
-            });
-            const data = await res.json();
-            log("Add Sticky to Group: " + JSON.stringify(data));
-            return data;
-        } catch (e) {
-            log("Add sticky to group error: " + e);
-            return null;
-        }
-    }
-
-    async function removeStickyFromGroup(groupId, stickyId) {
-        try {
-            const res = await fetch('/api/group/remove-sticky', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ groupId, stickyId })
-            });
-            const data = await res.json();
-            log("Remove Sticky from Group: " + JSON.stringify(data));
-            return data;
-        } catch (e) {
-            log("Remove sticky from group error: " + e);
-            return null;
-        }
-    }
-
-    async function runTests() {
-        logEl.textContent = '';
-
-        const email = `test${Date.now()}@demo.com`;
-        const password = 'abc123';
-
-        log("=== Starting Tests ===");
-
-        let res = await register(email, password);
-        if (res.status !== 'success') {
-            log("Registration failed, aborting tests.");
-            return;
-        }
-
-        res = await login(email, password);
-        if (res.status !== 'success') {
-            log("Login failed, aborting tests.");
-            return;
-        }
-
-        const groupId = await createTestGroup();
-
-        const sticky1 = await postSticky("Sticky 1", "First sticky text", "yellow", groupId);
-        const sticky2 = await postSticky("Sticky 2", "Second sticky text", "orange", groupId);
-
-        let stickies = await getStickyNotes();
-        if (stickies.length < 2) {
-            log(`Expected 2 stickies, got ${stickies.length}`);
-        } else {
-            log("Correct number of stickies after posting.");
-        }
-
-        await removeStickyFromGroup(groupId, sticky2);
-        stickies = await getStickyNotes();
-        if (stickies.find(s => s._id === sticky2)) {
-            log("Sticky 2 still present after removal from group.");
-        } else {
-            log("Sticky 2 removed from group successfully.");
-        }
-
-        await addStickyToGroup(groupId, sticky2);
-        stickies = await getStickyNotes();
-        if (!stickies.find(s => s._id === sticky2)) {
-            log("Sticky 2 missing after re-adding to group.");
-        } else {
-            log("Sticky 2 re-added to group successfully.");
-        }
-
-        await removeSticky(sticky1);
-
-        await removeSticky(sticky2);
-
-        stickies = await getStickyNotes();
-        log(`Final stickies count after removals: ${stickies.length}`);
-
-        log("=== All tests finished ===");
-    }
-</script>
+<script type="module" src="./main.js"></script>
 </body>
 </html>

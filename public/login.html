@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sticky Notes Login</title>
+  <style>
+    body {
+      display: flex;
+      height: 100vh;
+      align-items: center;
+      justify-content: center;
+      font-family: sans-serif;
+      margin: 0;
+      background: #f0f0f0;
+    }
+    #login-container {
+      background: white;
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      width: 320px;
+    }
+    input {
+      width: 100%;
+      padding: 0.75rem;
+      margin: 0.5rem 0;
+      font-size: 1rem;
+    }
+    button {
+      width: 100%;
+      padding: 0.75rem;
+      margin-top: 1rem;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    #error {
+      color: red;
+      min-height: 1.2rem;
+    }
+  </style>
+</head>
+<body>
+<div id="login-container">
+  <h2>Sticky Notes Login</h2>
+  <input type="email" id="email" placeholder="Email" required />
+  <input type="password" id="password" placeholder="Password" required />
+  <div id="error"></div>
+  <button id="loginBtn">Log In</button>
+  <button id="registerBtn">Register</button>
+</div>
+
+<script>
+  async function login() {
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value.trim();
+    const errorEl = document.getElementById('error');
+    errorEl.textContent = '';
+
+    if (!email || !password) {
+      errorEl.textContent = 'Please fill in both fields.';
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        window.location.href = '/';
+      } else {
+        errorEl.textContent = data.message || 'Login failed.';
+      }
+    } catch (e) {
+      errorEl.textContent = 'Network error.';
+    }
+  }
+
+  async function register() {
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value.trim();
+    const errorEl = document.getElementById('error');
+    errorEl.textContent = '';
+
+    if (!email || !password) {
+      errorEl.textContent = 'Please fill in both fields.';
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        window.location.href = '/';
+      } else {
+        errorEl.textContent = data.message || 'Registration failed.';
+      }
+    } catch (e) {
+      errorEl.textContent = 'Network error.';
+    }
+  }
+
+  document.getElementById('loginBtn').addEventListener('click', login);
+  document.getElementById('registerBtn').addEventListener('click', register);
+</script>
+</body>
+</html>
