@@ -27,7 +27,9 @@ app.get('/', async (req, res) => {
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SIGN_KEY);
+        console.log(decoded);
         const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
+        console.log(user);
 
         if (!user) {
             return res.redirect('/login');
@@ -44,6 +46,9 @@ app.get('/', async (req, res) => {
 
 app.get('/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+app.get('/register', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'register.html'));
 });
 
 

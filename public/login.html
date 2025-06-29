@@ -1,115 +1,328 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <title>Sticky Notes Login</title>
+  <title>Sticky Notes</title>
   <style>
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       display: flex;
       height: 100vh;
       align-items: center;
       justify-content: center;
-      font-family: sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
       margin: 0;
-      background: #f0f0f0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      position: relative;
+      overflow: hidden;
     }
+
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background:
+        radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 40% 40%, rgba(120, 119, 198, 0.2) 0%, transparent 50%);
+      animation: float 6s ease-in-out infinite;
+    }
+
+    @keyframes float {
+
+      0%,
+      100% {
+        transform: translateY(0px);
+      }
+
+      50% {
+        transform: translateY(-10px);
+      }
+    }
+
     #login-container {
-      background: white;
-      padding: 2rem;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      width: 320px;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px);
+      padding: 3rem 2.5rem;
+      border-radius: 20px;
+      box-shadow:
+        0 20px 40px rgba(0, 0, 0, 0.1),
+        0 0 0 1px rgba(255, 255, 255, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4);
+      width: 380px;
+      position: relative;
+      transform: translateY(0);
+      transition: all 0.3s ease;
+      z-index: 1;
     }
+
+    #login-container:hover {
+      transform: translateY(-5px);
+      box-shadow:
+        0 30px 60px rgba(0, 0, 0, 0.15),
+        0 0 0 1px rgba(255, 255, 255, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 2rem;
+      color: #333;
+      font-weight: 700;
+      font-size: 1.8rem;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .input-group {
+      position: relative;
+      margin: 1.5rem 0;
+    }
+
     input {
       width: 100%;
-      padding: 0.75rem;
-      margin: 0.5rem 0;
+      padding: 1rem 1.25rem;
       font-size: 1rem;
+      border: 2px solid #e1e5e9;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.8);
+      transition: all 0.3s ease;
+      outline: none;
     }
+
+    input:focus {
+      border-color: #667eea;
+      background: white;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      transform: translateY(-2px);
+    }
+
+    input::placeholder {
+      color: #9ca3af;
+      transition: opacity 0.3s ease;
+    }
+
+    input:focus::placeholder {
+      opacity: 0.7;
+    }
+
     button {
       width: 100%;
-      padding: 0.75rem;
-      margin-top: 1rem;
-      font-size: 1rem;
+      padding: 1rem;
+      margin: 0.75rem 0;
+      font-size: 1.1rem;
+      font-weight: 600;
       cursor: pointer;
+      border: none;
+      border-radius: 12px;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
     }
+
+    button::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+      transition: left 0.5s;
+    }
+
+    button:hover::before {
+      left: 100%;
+    }
+
+    #loginBtn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      margin-top: 1.5rem;
+    }
+
+    #loginBtn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+    }
+
+    #loginBtn:active {
+      transform: translateY(0);
+    }
+
+    #registerBtn {
+      background: transparent;
+      color: #667eea;
+      border: 2px solid #667eea;
+    }
+
+    #registerBtn:hover {
+      background: #667eea;
+      color: white;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(102, 126, 234, 0.2);
+    }
+
+    #registerBtn:active {
+      transform: translateY(0);
+    }
+
     #error {
-      color: red;
+      color: #ef4444;
       min-height: 1.2rem;
+      font-size: 0.9rem;
+      margin-top: 0.5rem;
+      opacity: 0;
+      transform: translateY(-10px);
+      transition: all 0.3s ease;
+    }
+
+    #error.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .floating-shapes {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      z-index: 0;
+    }
+
+    .shape {
+      position: absolute;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 50%;
+      animation: floatShapes 8s infinite ease-in-out;
+    }
+
+    .shape:nth-child(1) {
+      width: 80px;
+      height: 80px;
+      top: 20%;
+      left: 10%;
+      animation-delay: 0s;
+    }
+
+    .shape:nth-child(2) {
+      width: 120px;
+      height: 120px;
+      top: 60%;
+      right: 10%;
+      animation-delay: -2s;
+    }
+
+    .shape:nth-child(3) {
+      width: 60px;
+      height: 60px;
+      bottom: 20%;
+      left: 20%;
+      animation-delay: -4s;
+    }
+
+    @keyframes floatShapes {
+
+      0%,
+      100% {
+        transform: translateY(0px) rotate(0deg);
+        opacity: 0.7;
+      }
+
+      50% {
+        transform: translateY(-30px) rotate(180deg);
+        opacity: 0.3;
+      }
+    }
+
+    @media (max-width: 480px) {
+      #login-container {
+        width: 90%;
+        padding: 2rem 1.5rem;
+      }
     }
   </style>
 </head>
+
 <body>
-<div id="login-container">
-  <h2>Sticky Notes Login</h2>
-  <input type="email" id="email" placeholder="Email" required />
-  <input type="password" id="password" placeholder="Password" required />
-  <div id="error"></div>
-  <button id="loginBtn">Log In</button>
-  <button id="registerBtn">Register</button>
-</div>
+  <div class="floating-shapes">
+    <div class="shape"></div>
+    <div class="shape"></div>
+    <div class="shape"></div>
+  </div>
 
-<script>
-  async function login() {
-    const email = document.getElementById('email').value.trim();
-    const password = document.getElementById('password').value.trim();
-    const errorEl = document.getElementById('error');
-    errorEl.textContent = '';
+  <div id="login-container">
+    <h2>Sticky Notes</h2>
+    <div class="input-group">
+      <input type="email" id="email" placeholder="Enter your email" required />
+    </div>
+    <div class="input-group">
+      <input type="password" id="password" placeholder="Enter your password" required />
+    </div>
+    <div id="error"></div>
+    <button id="loginBtn">Sign In</button>
+    <div>Don't have an account? <a href="/register">Register</a></div>
+  </div>
 
-    if (!email || !password) {
-      errorEl.textContent = 'Please fill in both fields.';
-      return;
+  <script>
+    function showError(message) {
+      const errorEl = document.getElementById('error');
+      errorEl.textContent = message;
+      errorEl.classList.add('show');
+      setTimeout(() => {
+        errorEl.classList.remove('show');
+      }, 4000);
     }
 
-    try {
-      const res = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        window.location.href = '/';
-      } else {
-        errorEl.textContent = data.message || 'Login failed.';
+    async function login() {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const errorEl = document.getElementById('error');
+      errorEl.classList.remove('show');
+
+      if (!email || !password) {
+        showError('Please fill in both fields.');
+        return;
       }
-    } catch (e) {
-      errorEl.textContent = 'Network error.';
-    }
-  }
 
-  async function register() {
-    const email = document.getElementById('email').value.trim();
-    const password = document.getElementById('password').value.trim();
-    const errorEl = document.getElementById('error');
-    errorEl.textContent = '';
-
-    if (!email || !password) {
-      errorEl.textContent = 'Please fill in both fields.';
-      return;
-    }
-
-    try {
-      const res = await fetch('/api/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        window.location.href = '/';
-      } else {
-        errorEl.textContent = data.message || 'Registration failed.';
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          window.location.href = '/';
+        } else {
+          showError(data.message || 'Login failed.');
+        }
+      } catch (e) {
+        showError('Network error.');
       }
-    } catch (e) {
-      errorEl.textContent = 'Network error.';
     }
-  }
 
-  document.getElementById('loginBtn').addEventListener('click', login);
-  document.getElementById('registerBtn').addEventListener('click', register);
-</script>
+    document.getElementById('loginBtn').addEventListener('click', login);
+
+    // Add enter key support
+    document.addEventListener('keypress', function (e) {
+      if (e.key === 'Enter') {
+        login();
+      }
+    });
+  </script>
 </body>
+
 </html>
