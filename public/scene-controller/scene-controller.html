@@ -17,7 +17,6 @@
             position: relative;
             width: 100vw;
             height: 100vh;
-            background-image: url('https://images.unsplash.com/photo-1557683316-973673baf926?w=1920&h=1080&fit=crop');
             background-size: contain;
             background-position: center;
             background-repeat: no-repeat;
@@ -45,10 +44,19 @@
         }
 
         .sticky-note.collapsed {
-            height: auto;
+            width: 50px;
+            height: 50px;
+            image-rendering: pixelated;
+            transform: none !important;
+            border: 2px solid rgba(0, 0, 0, 0.2);
+            box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.2);
         }
 
         .sticky-note.collapsed .sticky-content {
+            display: none;
+        }
+
+        .sticky-note.collapsed .sticky-header {
             display: none;
         }
 
@@ -60,10 +68,6 @@
             justify-content: space-between;
             align-items: center;
             gap: 8px;
-        }
-
-        .sticky-note.collapsed .sticky-header {
-            border-radius: 8px;
         }
 
         .sticky-title {

@@ -17,6 +17,7 @@ const dbclient = new MongoClient(mongodb_URL, { serverApi: ServerApiVersion.v1 }
 const stickiesCollection = dbclient.db("sticky-notes-game").collection("stickies");
 const groupsCollection = dbclient.db("sticky-notes-game").collection("groups");
 const usersCollection = dbclient.db("sticky-notes-game").collection("users");
+const shareRequestsCollection = dbclient.db("sticky-notes-game").collection("shareRequests");
 
 app.get('/', async (req, res) => {
     const token = req.cookies?.token;
@@ -144,6 +145,32 @@ app.get('/api/get-joined-groups', verifyCookie, async (req, res) => {
     return res.json(friendly);
 })
 
+app.get('/api/get-group/:groupId', verifyCookie, async (req, res) => {
+    try {
+        const groupId = req.params.groupId;
+
+        // Check if user has access to this group
+        if (!req.user.groups.some(id => id.toString() === groupId)) {
+            return res.status(403).json({ status: "error", message: "You don't have permission to access this group" });
+        }
+
+        const groupDetails = await groupsCollection.findOne({ _id: new ObjectId(groupId) });
+
+        if (!groupDetails) {
+            return res.status(404).json({ status: "error", message: "Group not found" });
+        }
+
+        return res.json({
+            id: groupDetails._id.toString(),
+            name: groupDetails.name,
+            image: groupDetails.image
+        });
+    } catch (error) {
+        console.error("Error getting group details:", error);
+        res.status(500).json({ status: "error", message: "Internal server error" });
+    }
+})
+
 app.post('/api/create-group', verifyCookie, async (req, res) => {
     console.log("-------");
     console.log(req.decoded);
@@ -212,9 +239,19 @@ app.post('/api/get-stickies', verifyCookie, async (req, res) => {
         const decoded = jwtDecode(jwt)
         const email = decoded.email
         const user = await usersCollection.findOne({ email })
-        const userGroups = user.groups || [];
-        const groups = await groupsCollection.find({ _id: { $in: userGroups.map(id => new ObjectId(id)) } }).toArray();
-        const stickyIds = groups.flatMap(g => g.stickies || []).map(id => new ObjectId(id));
+        if (user.groups.includes(new ObjectId(req.body.groupId))) {
+            return res.status(403).json({ status: "error", message: "You don't have permission to access this group" });
+        }
+        var group;
+        console.log(req.body.groupId)
+        await groupsCollection.findOne({ _id: new ObjectId(req.body.groupId) } ).then((data) =>{
+            group = data;
+            console.log(group)
+        });
+        if (!group){
+            return res.status(404).json({ status: "error", message: "Group not found" });
+        }
+        const stickyIds = group.stickies.map(id => new ObjectId(id));
         const stickies = await stickiesCollection.find({ _id: { $in: stickyIds } }).toArray();
         console.log(stickies)
         return res.status(200).json(stickies);
@@ -291,7 +328,7 @@ app.post('/api/update-sticky-text', verifyCookie, async (req, res) => {
     res.json({ status: "ok", modified: result.modifiedCount });
 });
 
-app.post('/api/add-person-to-group', verifyCookie, async (req, res) => {
+app.post('/api/send-share-request', verifyCookie, async (req, res) => {
     try {
         const { email, groupId } = req.body;
 
@@ -316,15 +353,127 @@ app.post('/api/add-person-to-group', verifyCookie, async (req, res) => {
             return res.status(400).json({ status: "error", message: "User is already a member of this group" });
         }
 
-        // Add the group to the user's groups
-        await usersCollection.updateOne(
-            { _id: userToAdd._id },
-            { $addToSet: { groups: new ObjectId(groupId) } }
+        // Check if there's already a pending request for this user and group
+        const existingRequest = await shareRequestsCollection.findOne({
+            recipientId: userToAdd._id,
+            groupId: new ObjectId(groupId),
+            status: 'pending'
+        });
+
+        if (existingRequest) {
+            return res.status(400).json({ status: "error", message: "A share request is already pending for this user and group" });
+        }
+
+        // Get group details for the notification
+        const group = await groupsCollection.findOne({ _id: new ObjectId(groupId) });
+
+        // Create a share request
+        const shareRequest = {
+            senderId: currentUser._id,
+            senderEmail: currentUser.email,
+            recipientId: userToAdd._id,
+            recipientEmail: userToAdd.email,
+            groupId: new ObjectId(groupId),
+            groupName: group.name,
+            status: 'pending',
+            createdAt: new Date()
+        };
+
+        await shareRequestsCollection.insertOne(shareRequest);
+
+        res.status(200).json({ status: "success", message: "Share request sent successfully" });
+    } catch (error) {
+        console.error("Error sending share request:", error);
+        res.status(500).json({ status: "error", message: "Internal server error" });
+    }
+});
+
+app.post('/api/respond-to-share-request', verifyCookie, async (req, res) => {
+    try {
+        const { requestId, accept } = req.body;
+
+        if (!requestId) {
+            return res.status(400).json({ status: "error", message: "Missing request ID" });
+        }
+
+        // Find the share request
+        const shareRequest = await shareRequestsCollection.findOne({ 
+            _id: new ObjectId(requestId),
+            status: 'pending'
+        });
+
+        if (!shareRequest) {
+            return res.status(404).json({ status: "error", message: "Share request not found or already processed" });
+        }
+
+        // Verify that the current user is the recipient of the request
+        if (shareRequest.recipientId.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ status: "error", message: "You don't have permission to respond to this request" });
+        }
+
+        // Update the request status
+        const newStatus = accept ? 'accepted' : 'declined';
+        await shareRequestsCollection.updateOne(
+            { _id: new ObjectId(requestId) },
+            { $set: { status: newStatus, respondedAt: new Date() } }
         );
 
-        res.status(200).json({ status: "success", message: "User added to group successfully" });
+        // If accepted, add the user to the group
+        if (accept) {
+            await usersCollection.updateOne(
+                { _id: req.user._id },
+                { $addToSet: { groups: shareRequest.groupId } }
+            );
+        }
+
+        res.status(200).json({ 
+            status: "success", 
+            message: accept ? "Share request accepted" : "Share request declined" 
+        });
     } catch (error) {
-        console.error("Error adding person to group:", error);
+        console.error("Error responding to share request:", error);
+        res.status(500).json({ status: "error", message: "Internal server error" });
+    }
+});
+
+app.get('/api/get-pending-share-requests', verifyCookie, async (req, res) => {
+    try {
+        // Find all pending share requests for the current user
+        const pendingRequests = await shareRequestsCollection.find({
+            recipientId: req.user._id,
+            status: 'pending'
+        }).toArray();
+
+        res.status(200).json(pendingRequests);
+    } catch (error) {
+        console.error("Error getting pending share requests:", error);
+        res.status(500).json({ status: "error", message: "Internal server error" });
+    }
+});
+
+// Keep the original endpoint for backward compatibility, but make it use the new share request system
+app.post('/api/add-person-to-group', verifyCookie, async (req, res) => {
+    try {
+        const { email, groupId } = req.body;
+
+        if (!email || !groupId) {
+            return res.status(400).json({ status: "error", message: "Missing email or groupId" });
+        }
+
+        // Redirect to the new share request endpoint
+        const result = await fetch(`${req.protocol}://${req.get('host')}/api/send-share-request`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Cookie': req.headers.cookie
+            },
+            body: JSON.stringify({ email, groupId })
+        });
+
+        const data = await result.json();
+        res.status(result.status).json(data);
+    } catch (error) {
+        console.error("Error in add-person-to-group:", error);
         res.status(500).json({ status: "error", message: "Internal server error" });
     }
 });

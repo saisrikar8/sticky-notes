@@ -39,12 +39,13 @@ export async function register(email, password) {
     }
 }
 
-export async function getStickies() {
+export async function getStickies(groupId) {
     try {
         const res = await fetch('/api/get-stickies', {
             method: 'POST',
             credentials: 'include',
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ groupId })
         });
 
         if (!res.ok) {
@@ -240,7 +241,7 @@ export async function getAvailableScenes() {
     }
 }
 
-export async function addPersonToGroup(email, groupId) {
+export async function sendShareRequest(email, groupId) {
     try {
         // If groupId is not provided, get it from the URL
         if (!groupId) {
@@ -248,7 +249,7 @@ export async function addPersonToGroup(email, groupId) {
             groupId = pathParts[pathParts.length - 1];
         }
 
-        const res = await fetch('/api/add-person-to-group', {
+        const res = await fetch('/api/send-share-request', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
@@ -257,12 +258,82 @@ export async function addPersonToGroup(email, groupId) {
 
         if (!res.ok) {
             const errorData = await res.json();
-            throw new Error(errorData.message || 'Failed to add person to group');
+            throw new Error(errorData.message || 'Failed to send share request');
         }
 
         return res.json();
     } catch (error) {
-        console.error('Add person to group error:', error);
+        console.error('Send share request error:', error);
+        throw error;
+    }
+}
+
+export async function getPendingShareRequests() {
+    try {
+        const res = await fetch('/api/get-pending-share-requests', {
+            method: 'GET',
+            credentials: 'include'
+        });
+
+        if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.message || 'Failed to get pending share requests');
+        }
+
+        return res.json();
+    } catch (error) {
+        console.error('Get pending share requests error:', error);
+        throw error;
+    }
+}
+
+export async function respondToShareRequest(requestId, accept) {
+    try {
+        const res = await fetch('/api/respond-to-share-request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ requestId, accept })
+        });
+
+        if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.message || 'Failed to respond to share request');
+        }
+
+        return res.json();
+    } catch (error) {
+        console.error('Respond to share request error:', error);
+        throw error;
+    }
+}
+
+// Keep for backward compatibility
+export async function addPersonToGroup(email, groupId) {
+    return sendShareRequest(email, groupId);
+}
+
+export async function getGroupDetails(groupId) {
+    try {
+        // If groupId is not provided, get it from the URL
+        if (!groupId) {
+            const pathParts = window.location.pathname.split('/');
+            groupId = pathParts[pathParts.length - 1];
+        }
+
+        const res = await fetch(`/api/get-group/${groupId}`, {
+            method: 'GET',
+            credentials: 'include'
+        });
+
+        if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.message || 'Failed to get group details');
+        }
+
+        return res.json();
+    } catch (error) {
+        console.error('Get group details error:', error);
         throw error;
     }
 }
