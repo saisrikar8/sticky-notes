@@ -1,3 +1,6 @@
+// controller-new.js
+import { updateStickyPosition, getStickies, updateStickyText, postSticky, removeSticky, addPersonToGroup } from './api.js';
+
 class StickyNotesManager {
   constructor() {
     this.notes = [];
@@ -6,27 +9,22 @@ class StickyNotesManager {
     this.selectedNote = null;
     this.zoomLevel = 1;
 
-    // Background image dimensions for relative positioning
-    this.backgroundWidth = 1920; // Set this to your background image width
-    this.backgroundHeight = 1080; // Set this to your background image height
+    this.backgroundWidth = 1920;
+    this.backgroundHeight = 1080;
 
     this.init();
     this.updateWorkspaceScale();
     window.addEventListener('resize', () => this.updateWorkspaceScale());
   }
 
-  init() {
-    // Add note button
-    document.getElementById('addNoteBtn').addEventListener('click', () => {
-      this.addNote();
-    });
+  async init() {
+    document.getElementById('addNoteBtn').addEventListener('click', () => this.addNote());
+    document.getElementById('addPersonBtn').addEventListener('click', () => this.addPerson());
 
-    // Zoom controls
     document.getElementById('zoomIn').addEventListener('click', () => this.zoom(1.2));
     document.getElementById('zoomOut').addEventListener('click', () => this.zoom(0.8));
     document.getElementById('zoomReset').addEventListener('click', () => this.resetZoom());
 
-    // Quick color options
     const colorOptions = document.querySelectorAll('.color-option');
     colorOptions.forEach(option => {
       option.addEventListener('click', () => {
@@ -38,54 +36,116 @@ class StickyNotesManager {
       });
     });
 
-    // Add initial note
-    this.addNote();
+    try {
+      // Load stickies from server
+      const stickies = await getStickies();
+      if (stickies && Array.isArray(stickies)) {
+        stickies.forEach(sticky => {
+          // Create note with server data
+          const note = new DraggableSticky(this, sticky._id, sticky.x || 50, sticky.y || 50, sticky);
+          this.notes.push(note);
+          if (sticky._id >= this.nextId) this.nextId = sticky._id + 1;
+        });
+      }
+    } catch (error) {
+      console.error('Error loading stickies:', error);
+      // Redirect to login if unauthorized
+      if (error.message.includes('401') || error.message.includes('unauthorized')) {
+        window.location.href = '/login';
+        return;
+      }
+    }
+
+    this.updateWorkspaceScale();
+    this.updatePositionDisplay();
+  }
+
+  async addPerson() {
+    try {
+      // Prompt user for email address
+      const email = prompt('Enter the email address of the person to add to this group:');
+
+      // Check if user cancelled or entered empty string
+      if (!email) {
+        return;
+      }
+
+      // Get current group ID from URL
+      const pathParts = window.location.pathname.split('/');
+      const groupId = pathParts[pathParts.length - 1];
+
+      // Call API to add person to group
+      const result = await addPersonToGroup(email, groupId);
+
+      // Show success message
+      alert(`Successfully added ${email} to the group!`);
+
+      return result;
+    } catch (error) {
+      console.error('Error adding person to group:', error);
+      alert(`Failed to add person to group: ${error.message}`);
+    }
   }
 
   updateWorkspaceScale() {
-    // Calculate how the background image scales
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
 
     const scaleX = viewportWidth / this.backgroundWidth;
     const scaleY = viewportHeight / this.backgroundHeight;
-
-    // Use contain sizing (fit entire image, may have letterboxing)
     this.backgroundScale = Math.min(scaleX, scaleY);
 
-    // Calculate actual displayed background dimensions
     this.displayedBackgroundWidth = this.backgroundWidth * this.backgroundScale;
     this.displayedBackgroundHeight = this.backgroundHeight * this.backgroundScale;
 
-    // Calculate offset to center the background
     this.backgroundOffsetX = (viewportWidth - this.displayedBackgroundWidth) / 2;
     this.backgroundOffsetY = (viewportHeight - this.displayedBackgroundHeight) / 2;
 
-    // Update all note positions
     this.notes.forEach(note => note.updateAbsolutePosition());
-
-    console.log(`Background scale: ${this.backgroundScale.toFixed(3)}, Display size: ${this.displayedBackgroundWidth.toFixed(0)}x${this.displayedBackgroundHeight.toFixed(0)}`);
   }
 
-  addNote(relativeX = null, relativeY = null) {
-    const note = new DraggableSticky(this, this.nextId++, relativeX, relativeY);
-    this.notes.push(note);
-    this.updatePositionDisplay();
-    console.log(`Added note #${note.id} at relative position X: ${note.relativePosition.x.toFixed(2)}%, Y: ${note.relativePosition.y.toFixed(2)}%`);
-    return note;
-  }
+  async addNote(relativeX = 50, relativeY = 50) {
+    try {
+      // Get current group ID from URL
+      const pathParts = window.location.pathname.split('/');
+      const groupId = pathParts[pathParts.length - 1];
 
-  removeNote(note) {
-    const index = this.notes.indexOf(note);
-    if (index > -1) {
-      this.notes.splice(index, 1);
-      note.element.remove();
+      // Post new sticky to server first
+      const savedSticky = await postSticky({
+        title: 'New Note',
+        text: '',
+        color: '#ffeb3b',
+        x: relativeX,
+        y: relativeY,
+        groupId: groupId
+      });
+
+      const note = new DraggableSticky(this, savedSticky._id || savedSticky.id, relativeX, relativeY, {
+        title: 'New Note',
+        text: '',
+        color: '#ffeb3b',
+        x: relativeX,
+        y: relativeY
+      });
+      this.notes.push(note);
       this.updatePositionDisplay();
-      console.log(`Removed note #${note.id}`);
+    } catch (error) {
+      console.error('Error adding note:', error);
+    }
+  }
 
-      if (this.selectedNote === note) {
-        this.selectedNote = null;
+  async removeNote(note) {
+    try {
+      await removeSticky(note.id);
+      const index = this.notes.indexOf(note);
+      if (index > -1) {
+        this.notes.splice(index, 1);
+        note.element.remove();
+        this.updatePositionDisplay();
+        if (this.selectedNote === note) this.selectedNote = null;
       }
+    } catch (error) {
+      console.error('Error removing note:', error);
     }
   }
 
@@ -102,13 +162,11 @@ class StickyNotesManager {
     this.zoomLevel = Math.max(0.3, Math.min(3, this.zoomLevel));
     this.workspace.style.transform = `scale(${this.zoomLevel})`;
     this.workspace.style.transformOrigin = '0 0';
-    console.log(`Zoom level: ${(this.zoomLevel * 100).toFixed(0)}%`);
   }
 
   resetZoom() {
     this.zoomLevel = 1;
     this.workspace.style.transform = 'scale(1)';
-    console.log('Zoom reset to 100%');
   }
 
   updatePositionDisplay() {
@@ -123,14 +181,12 @@ class StickyNotesManager {
     }
   }
 
-  // Convert absolute pixel position to relative percentage on background image
   absoluteToRelative(x, y) {
     const relativeX = ((x - this.backgroundOffsetX) / this.displayedBackgroundWidth) * 100;
     const relativeY = ((y - this.backgroundOffsetY) / this.displayedBackgroundHeight) * 100;
-    return { x: relativeX, y: relativeY };
+    return { x: Math.max(0, Math.min(100, relativeX)), y: Math.max(0, Math.min(100, relativeY)) };
   }
 
-  // Convert relative percentage to absolute pixel position
   relativeToAbsolute(relativeX, relativeY) {
     const x = this.backgroundOffsetX + (relativeX / 100) * this.displayedBackgroundWidth;
     const y = this.backgroundOffsetY + (relativeY / 100) * this.displayedBackgroundHeight;
@@ -139,105 +195,118 @@ class StickyNotesManager {
 }
 
 class DraggableSticky {
-  constructor(manager, id, relativeX = null, relativeY = null) {
+  constructor(manager, id, relativeX = 50, relativeY = 50, sticky = null) {
     this.manager = manager;
     this.id = id;
     this.isDragging = false;
     this.offset = { x: 0, y: 0 };
     this.isCollapsed = false;
+    this.debouncedUpdate = null;
+    this.debouncedPositionUpdate = null;
 
-    // store position as percentage relative to background image
-    if (relativeX !== null && relativeY !== null) {
-      this.relativePosition = { x: relativeX, y: relativeY };
+    this.relativePosition = { x: relativeX, y: relativeY };
+
+    if (sticky) {
+      this.createElement(sticky.title || 'New Note', sticky.text || '', sticky.color || '#ffeb3b');
     } else {
-      // random position within the background area (20-80% range)
-      this.relativePosition = {
-        x: 20 + Math.random() * 60, // 20% to 80% of background width
-        y: 20 + Math.random() * 60  // 20% to 80% of background height
-      };
+      this.createElement();
     }
 
-    this.createElement();
     this.updateAbsolutePosition();
     this.init();
   }
 
-  createElement() {
+  createElement(title = "New Note", content = "", color = "#ffeb3b") {
     this.element = document.createElement('div');
     this.element.className = 'sticky-note';
+    this.element.style.backgroundColor = color;
     this.element.innerHTML = `
-                    <div class="sticky-header">
-                        <input type="text" class="sticky-title" value="example note" placeholder="Enter title...">
-                        <div class="header-controls">
-                            <input type="color" class="color-picker" value="#ffeb3b">
-                            <button class="control-btn collapse-btn" title="Collapse/Expand">−</button>
-                            <button class="control-btn delete-btn" title="Delete">×</button>
-                        </div>
-                    </div>
-                    <div class="sticky-content">
-                        <textarea class="content-textarea" placeholder="Write your note here...">This is sticky note #${this.id}! This is a minimal sticky note example</textarea>
-                    </div>
-                `;
+      <div class="sticky-header">
+        <input type="text" class="sticky-title" value="${title}" placeholder="Enter title...">
+        <div class="header-controls">
+          <input type="color" class="color-picker" value="${color}">
+          <button class="control-btn collapse-btn" title="Collapse/Expand">−</button>
+          <button class="control-btn delete-btn" title="Delete">×</button>
+        </div>
+      </div>
+      <div class="sticky-content">
+        <textarea class="content-textarea" placeholder="Write your note here...">${content}</textarea>
+      </div>`;
 
     this.manager.workspace.appendChild(this.element);
   }
 
   updateAbsolutePosition() {
-    // do scaling conversion
     const absolute = this.manager.relativeToAbsolute(this.relativePosition.x, this.relativePosition.y);
-
-    // bounds control
-    const maxX = window.innerWidth - this.element.offsetWidth;
-    const maxY = window.innerHeight - this.element.offsetHeight;
-
-    this.absolutePosition = {
-      x: Math.max(0, Math.min(maxX, absolute.x)),
-      y: Math.max(0, Math.min(maxY, absolute.y))
-    };
-
+    this.absolutePosition = absolute;
     this.element.style.left = this.absolutePosition.x + 'px';
     this.element.style.top = this.absolutePosition.y + 'px';
   }
 
   init() {
-
-    // listeners to handle listening lmao
     this.element.addEventListener('mousedown', this.handleMouseDown.bind(this));
     document.addEventListener('mousemove', this.handleMouseMove.bind(this));
     document.addEventListener('mouseup', this.handleMouseUp.bind(this));
 
-    // color picker and buttons menu
+    const titleInput = this.element.querySelector('.sticky-title');
+    const contentTextarea = this.element.querySelector('.content-textarea');
+
+    titleInput.addEventListener('input', () => this.scheduleTextUpdate());
+    contentTextarea.addEventListener('input', () => this.scheduleTextUpdate());
+
     const colorPicker = this.element.querySelector('.color-picker');
     colorPicker.addEventListener('change', this.handleColorChange.bind(this));
+
     const collapseBtn = this.element.querySelector('.collapse-btn');
     const deleteBtn = this.element.querySelector('.delete-btn');
 
-    collapseBtn.addEventListener('click', (e) => {
+    collapseBtn.addEventListener('click', e => {
       e.stopPropagation();
       this.toggleCollapse();
     });
 
-    deleteBtn.addEventListener('click', (e) => {
+    deleteBtn.addEventListener('click', e => {
       e.stopPropagation();
       this.manager.removeNote(this);
     });
 
-    // stop mouse behavior when dragging
     const inputs = this.element.querySelectorAll('input, textarea, button');
     inputs.forEach(input => {
-      input.addEventListener('mousedown', (e) => e.stopPropagation());
+      input.addEventListener('mousedown', e => e.stopPropagation());
     });
 
-    // select a note onclick listener
     this.element.addEventListener('click', () => {
       this.manager.selectNote(this);
       this.manager.updatePositionDisplay();
     });
   }
 
+  scheduleTextUpdate() {
+    clearTimeout(this.debouncedUpdate);
+    this.debouncedUpdate = setTimeout(async () => {
+      try {
+        const title = this.element.querySelector('.sticky-title').value;
+        const content = this.element.querySelector('.content-textarea').value;
+        await updateStickyText(this.id, title, content);
+      } catch (error) {
+        console.error('Error updating sticky text:', error);
+      }
+    }, 500);
+  }
+
+  schedulePositionUpdate() {
+    clearTimeout(this.debouncedPositionUpdate);
+    this.debouncedPositionUpdate = setTimeout(async () => {
+      try {
+        await updateStickyPosition(this.id, this.relativePosition.x, this.relativePosition.y);
+      } catch (error) {
+        console.error('Error updating sticky position:', error);
+      }
+    }, 100);
+  }
+
   handleMouseDown(e) {
     if (e.target.matches('input, textarea, button')) return;
-
     this.isDragging = true;
     this.element.classList.add('dragging');
     this.manager.selectNote(this);
@@ -257,19 +326,18 @@ class DraggableSticky {
     const newX = (e.clientX / scale) - this.offset.x;
     const newY = (e.clientY / scale) - this.offset.y;
 
-    // keep within viewport bounds
-    this.absolutePosition.x = Math.max(0, Math.min(window.innerWidth - this.element.offsetWidth, newX));
-    this.absolutePosition.y = Math.max(0, Math.min(window.innerHeight - this.element.offsetHeight, newY));
+    this.absolutePosition = {
+      x: Math.max(0, Math.min(window.innerWidth - this.element.offsetWidth, newX)),
+      y: Math.max(0, Math.min(window.innerHeight - this.element.offsetHeight, newY))
+    };
 
-    // udpate relative position based on new absolute position
     this.relativePosition = this.manager.absoluteToRelative(this.absolutePosition.x, this.absolutePosition.y);
-
-    // stay within background bounds
-    this.relativePosition.x = Math.max(0, Math.min(100, this.relativePosition.x));
-    this.relativePosition.y = Math.max(0, Math.min(100, this.relativePosition.y));
 
     this.element.style.left = this.absolutePosition.x + 'px';
     this.element.style.top = this.absolutePosition.y + 'px';
+
+    // Schedule position update to server
+    this.schedulePositionUpdate();
 
     this.manager.updatePositionDisplay();
   }
@@ -278,7 +346,6 @@ class DraggableSticky {
     if (this.isDragging) {
       this.isDragging = false;
       this.element.classList.remove('dragging');
-      console.log(`Note #${this.id} moved to relative position: X: ${this.relativePosition.x.toFixed(2)}%, Y: ${this.relativePosition.y.toFixed(2)}%`);
     }
   }
 
@@ -297,18 +364,19 @@ class DraggableSticky {
     const collapseBtn = this.element.querySelector('.collapse-btn');
     collapseBtn.textContent = this.isCollapsed ? '+' : '−';
     collapseBtn.title = this.isCollapsed ? 'Expand' : 'Collapse';
-
-    console.log(`Note #${this.id} ${this.isCollapsed ? 'collapsed' : 'expanded'}`);
   }
 }
 
-// initialize sticky notes manager
-const notesManager = new StickyNotesManager();
+// Initialize the app
+let notesManager;
 
-// handle window resize listener
-window.addEventListener('resize', () => {
-  notesManager.updateWorkspaceScale();
-  notesManager.updatePositionDisplay();
+window.addEventListener('DOMContentLoaded', () => {
+  notesManager = new StickyNotesManager();
 });
 
-console.log('Multi Sticky Notes with background-relative positioning initialized');
+window.addEventListener('resize', () => {
+  if (notesManager) {
+    notesManager.updateWorkspaceScale();
+    notesManager.updatePositionDisplay();
+  }
+});

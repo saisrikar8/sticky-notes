@@ -196,7 +196,7 @@ app.post('/api/update-sticky-position', verifyCookie, async (req, res) => {
         );
 
         if (result.matchedCount === 0) {
-            return res.status(404).json({ status: "error", message: "Sticky note not found" });
+            stickiesCollection.updateOne({_id: new ObjectId(id)}, { $set: { x: x, y: y } });
         }
 
         res.status(200).json({ status: "success", message: "Sticky position updated" });
@@ -208,14 +208,19 @@ app.post('/api/update-sticky-position', verifyCookie, async (req, res) => {
 
 app.post('/api/get-stickies', verifyCookie, async (req, res) => {
     try {
-        const userGroups = req.user.groups || [];
+        const jwt = req.cookies.token
+        const decoded = jwtDecode(jwt)
+        const email = decoded.email
+        const user = await usersCollection.findOne({ email })
+        const userGroups = user.groups || [];
         const groups = await groupsCollection.find({ _id: { $in: userGroups.map(id => new ObjectId(id)) } }).toArray();
         const stickyIds = groups.flatMap(g => g.stickies || []).map(id => new ObjectId(id));
         const stickies = await stickiesCollection.find({ _id: { $in: stickyIds } }).toArray();
-        res.status(200).json(stickies);
+        console.log(stickies)
+        return res.status(200).json(stickies);
     } catch (e) {
         console.error("Error getting stickies:", e);
-        res.status(500).json({ error: "Failed to fetch stickies" });
+        return res.status(500).json({ error: "Failed to fetch stickies" });
     }
 });
 
@@ -272,6 +277,55 @@ app.post('/api/group/remove-sticky', verifyCookie, async (req, res) => {
     } catch (e) {
         console.error("Error removing sticky from group:", e);
         res.status(500).json({ status: "error", message: "Failed to remove sticky from group" });
+    }
+});
+
+app.post('/api/update-sticky-text', verifyCookie, async (req, res) => {
+    const { id, title, text } = req.body;
+    console.log(id)
+    const result = await stickiesCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { title, text } }
+    );
+    console.log(result)
+    res.json({ status: "ok", modified: result.modifiedCount });
+});
+
+app.post('/api/add-person-to-group', verifyCookie, async (req, res) => {
+    try {
+        const { email, groupId } = req.body;
+
+        if (!email || !groupId) {
+            return res.status(400).json({ status: "error", message: "Missing email or groupId" });
+        }
+
+        // Find the user by email
+        const userToAdd = await usersCollection.findOne({ email });
+        if (!userToAdd) {
+            return res.status(404).json({ status: "error", message: "User not found" });
+        }
+
+        // Check if the current user has access to the group
+        const currentUser = req.user;
+        if (!currentUser.groups.some(id => id.toString() === groupId)) {
+            return res.status(403).json({ status: "error", message: "You don't have permission to add users to this group" });
+        }
+
+        // Check if the user is already in the group
+        if (userToAdd.groups && userToAdd.groups.some(id => id.toString() === groupId)) {
+            return res.status(400).json({ status: "error", message: "User is already a member of this group" });
+        }
+
+        // Add the group to the user's groups
+        await usersCollection.updateOne(
+            { _id: userToAdd._id },
+            { $addToSet: { groups: new ObjectId(groupId) } }
+        );
+
+        res.status(200).json({ status: "success", message: "User added to group successfully" });
+    } catch (error) {
+        console.error("Error adding person to group:", error);
+        res.status(500).json({ status: "error", message: "Internal server error" });
     }
 });
 
