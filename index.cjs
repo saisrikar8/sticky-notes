@@ -48,7 +48,6 @@ app.get('/', async (req, res) => {
     }
 });
 
-
 app.get('/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'onboarding', 'login.html'));
 });
@@ -61,7 +60,7 @@ app.get('/scene/:groupId', verifyCookie, async (req, res) => {
     if (!req.user.groups.map(id => id.toString()).includes(groupId)) {
         return res.status(401).json({ message: "You are not allowed to access this group" });
     }
-    return res.send("ok");
+    res.sendFile(path.join(__dirname, 'public', 'scene-controller', 'scene-controller.html'));
 })
 
 app.post("/api/register", async (req, res) => {
