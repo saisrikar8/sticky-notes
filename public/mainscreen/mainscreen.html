@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sticky Notes App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/mainscreen/main.js"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: sans-serif;
+            overflow: hidden;
+        }
+
+        .sticky {
+            position: absolute;
+            width: 150px;
+            height: 150px;
+            background: #fffc8c;
+            padding: 10px;
+            box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.2);
+            cursor: move;
+            resize: both;
+            overflow: auto;
+        }
+
+        .xy-label {
+            font-size: 11px;
+            color: #555;
+            position: absolute;
+            bottom: 2px;
+            right: 4px;
+        }
+
+        .scroll-container {
+            display: flex;
+            overflow-x: auto;
+            white-space: nowrap;
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+
+        .item {
+            flex: 0 0 auto;
+            text-align: center;
+            margin-right: 10px;
+        }
+
+        .item img {
+            width: 50%;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 p-6">
+    <div class="max-w-7xl mx-auto">
+        <!-- Create Group Button -->
+        <div class="flex justify-center mb-8">
+            <button onclick="openCreateModal()"
+                class="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-4 rounded-full font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 flex items-center gap-3">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 12h14"></path>
+                    <path d="M12 5v14"></path>
+                </svg>
+                Create New Group
+            </button>
+        </div>
+
+        <!-- Groups Gallery -->
+        <div class="overflow-x-auto pb-4 scrollbar-hide">
+            <div id="groupsContainer" class="flex gap-6 min-w-max">
+                <!-- Groups will be inserted here by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Create Group Modal -->
+        <div id="createModal"
+            class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+            <div
+                class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 transform animate-in fade-in zoom-in duration-200">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800">Create New Group</h2>
+                    <button onclick="closeCreateModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 6 6 18"></path>
+                            <path d="M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            Group Name
+                        </label>
+                        <input type="text" id="newGroupName" placeholder="Enter group name..."
+                            class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all"
+                            onkeypress="handleEnterKey(event)" />
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            Scene
+                        </label>
+                        <select id="sceneSelection"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all bg-white">
+                        </select>
+                        <button onclick="createGroup()" id="createButton"
+                            class="mt-5 flex-1 py-3 px-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                            Create Group
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+</body>
+
+
+
+</html>

@@ -10,6 +10,7 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
+const fs = require('fs').promises;
 
 const mongodb_URL = `mongodb+srv://tummalasaisrikar:${process.env.MONGODB_PASSWORD}@yichangs-temu-storage.irg9scu.mongodb.net/?retryWrites=true&w=majority&appName=YICHANGS-TEMU-STORAGE`;
 const dbclient = new MongoClient(mongodb_URL, { serverApi: ServerApiVersion.v1 });
@@ -38,7 +39,7 @@ app.get('/', async (req, res) => {
             return res.redirect('/login');
         }
 
-        res.sendFile(path.join(__dirname, 'public', 'mainscreen.html'), {
+        res.sendFile(path.join(__dirname, 'public', 'mainscreen', 'mainscreen.html'), {
             headers: { 'Content-Type': 'text/html' }
         });
     } catch (err) {
@@ -49,11 +50,19 @@ app.get('/', async (req, res) => {
 
 
 app.get('/login', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'login.html'));
+    res.sendFile(path.join(__dirname, 'public', 'onboarding', 'login.html'));
 });
 app.get('/register', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'register.html'));
+    res.sendFile(path.join(__dirname, 'public', 'onboarding', 'register.html'));
 });
+app.get('/scene/:groupId', verifyCookie, async (req, res) => {
+    const groupId = req.params.groupId;
+    console.log(req.user);
+    if (!req.user.groups.map(id => id.toString()).includes(groupId)) {
+        return res.status(401).json({ message: "You are not allowed to access this group" });
+    }
+    return res.send("ok");
+})
 
 app.post("/api/register", async (req, res) => {
     const email = req.body.email.trim();
@@ -103,16 +112,48 @@ app.post("/api/login", async (req, res) => {
     return res.json({ status: "success", message: "Welcome back! We're logging you in right now", token, exp: jwtDecode(token).exp });
 });
 
+app.get("/api/get-avaliable-scenes", async (req, res) => {
+    try {
+        const scenesDir = path.join(__dirname, 'public/scenes');
+        const files = await fs.readdir(scenesDir);
+
+        const sceneNames = files
+            .filter(file => file.endsWith('.png'))
+            .map(file => path.basename(file, '.png'));
+
+        res.json(sceneNames);
+    } catch (error) {
+        console.error('Error reading scenes directory:', error);
+        res.status(500).json({ error: 'Could not read scenes directory' });
+    }
+});
+
 app.get('/api/get-joined-groups', verifyCookie, async (req, res) => {
     const user = req.user;
-    console.log(user);
-    return res.json(user.groups);
+    const friendly = [];
 
+    for (const groupId of user.groups) {
+        const groupDetails = await groupsCollection.findOne({ _id: groupId });
+        if (!groupDetails) {
+            friendly.push({ name: "unknown group", id: -1, image: "undefined" });
+            continue;
+        }
+        friendly.push({ name: groupDetails.name, id: groupId.toString(), image: groupDetails.image });
+    }
+
+    console.log(friendly);
+    return res.json(friendly);
 })
 
 app.post('/api/create-group', verifyCookie, async (req, res) => {
-    const { name } = req.body;
-    const result = await groupsCollection.insertOne({ name, stickies: [] });
+    console.log("-------");
+    console.log(req.decoded);
+    console.log(req.user);
+    console.log("here is req body");
+    console.log(req.body);
+    const name = req.body.name;
+    const image = req.body.image;
+    const result = await groupsCollection.insertOne({ name, image, stickies: [] });
     await usersCollection.updateOne(
         { _id: req.user._id },
         { $push: { groups: result.insertedId } }
