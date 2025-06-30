@@ -347,6 +347,7 @@ class StickyNotesManager {
         if (this.selectedNote === note) this.selectedNote = null;
       }
     } catch (error) {
+      window.location.reload();
       console.error('Error removing note:', error);
     }
   }
